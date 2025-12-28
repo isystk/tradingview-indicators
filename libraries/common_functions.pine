@@ -1,0 +1,17 @@
+//@version=5
+// Author: Yoshitaka Ise
+// Library: Common Functions
+// Version: 1.0.0
+
+library("CommonFunctions")
+
+// ===== Trend判定 =====
+export isBullTrend(src, shortLen, longLen) =>
+    ta.ema(src, shortLen) > ta.ema(src, longLen)
+
+export isBearTrend(src, shortLen, longLen) =>
+    ta.ema(src, shortLen) < ta.ema(src, longLen)
+
+// ===== ボラティリティ判定 =====
+export atrFilter(len, threshold) =>
+    ta.atr(len) > threshold
