@@ -17,7 +17,7 @@
 strategy('EMA + 一目均衡表 + BB（ストラテジー）', overlay = true, initial_capital = 1000000, default_qty_type = strategy .percent_of_equity, default_qty_value = 100)
 
 // ===== library import =====
-import ise0615/EMA_Ichimoku_BB_Function/1 as lib
+import ise0615/EMA_Ichimoku_BB_Function/2 as lib
 
 // パラメーター設定
 src = input.source(close, "元データ")

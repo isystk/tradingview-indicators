@@ -65,9 +65,9 @@ export calc(float src, int e5, int e25, int e50, int e100, int e200, int bbLen, 
     eBuy  = ta.crossover(e5_v, e25_v) and inBearishCloud
     eSell = ta.crossunder(e5_v, e25_v) and inBullishCloud
 
-    // 包み線 (Engulfing)
-    bullEng = close > open[1] and open < close[1] and close[1] < open[1]
-    bearEng = close < open[1] and open > close[1] and close[1] > open[1]
+    // 包み線（ヒゲも含む）
+    bullEng = close > open and close[1] < open[1] and low <= low[1] and close >= high[1]
+    bearEng = close < open and close[1] > open[1] and high >= high[1] and close <= low[1]
 
     // 出来高急騰
     volAvg = ta.sma(volume, 20)

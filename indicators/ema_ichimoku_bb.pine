@@ -17,7 +17,7 @@
 indicator('EMA + 一目均衡表 + BB', overlay = true)
 
 // ===== library import =====
-import ise0615/EMA_Ichimoku_BB_Function/1 as lib
+import ise0615/EMA_Ichimoku_BB_Function/2 as lib
 
 // パラメーター設定
 src = input.source(close, "元データ")
@@ -49,6 +49,7 @@ p_senkouB = plot(res.senkouB, offset = disp, color = color.maroon, title = '先�
 // 遅行スパン（現在の価格を26日後ろにずらす）
 plot(close, offset = -disp, color = color.gray, title = '遅行スパン', display = display.none)
 fill(p_senkouA, p_senkouB, color = res.senkouA > res.senkouB ? color.new(color.green, 90) : color.new(color.red, 90), title = '一目雲')
+
 
 // シグナル表示
 plotshape(res.emaBuy,  title = 'EMAクロス買い', location = location.belowbar, color = color.lime, style = shape.labelup, text = '買', textcolor = color.black)
