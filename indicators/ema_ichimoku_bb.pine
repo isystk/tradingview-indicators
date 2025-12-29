@@ -1,14 +1,14 @@
 //@version=6
-// インジケーター名: 「EMA + 一目均衡表 + BB」
+// インジケーター名: 「EMA + 一目均衡表 + BB（インジケーター）」
 // 
 // 概要:
 // 本インジケーターは、複数の指数移動平均（EMA）とローソク足パターン「包み線」を用いた売買シグナルを提供します。
 // 
 // 主な機能:
 // - 5本のEMA（5, 25, 50, 100, 200）をプロット
-// - EMAクロスと長期トレンドを組み合わせた売買シグナルを表示
-//   ・買い：EMA5が25を上抜け（雲の下で発生）後、EMA100が上昇中
-//   ・売り：EMA5が25を下抜け（雲の上で発生）後、EMA100が下落中
+// - EMA5とEMA25のクロスによる売買シグナルを表示
+//   ・買い：EMA5が25を上抜け ＋ 価格が雲の下
+//   ・売り：EMA5が25を下抜け ＋ 価格が雲の上
 // - ボリンジャーバンドを表示（中心線、上下バンド）
 // - 出来高が急騰したときにシグナル（●）を表示
 // - 一目均衡表を表示
@@ -17,132 +17,61 @@
 indicator('EMA + 一目均衡表 + BB', overlay = true)
 
 // ===== library import =====
-import ise0615/CommonFunctions/2 as cf
+import ise0615/EMA_Ichimoku_BB_Function/1 as lib
 
-// === パラメーター設定 (Group化で整理) ===
-gp_ema = "EMA設定"
-src = input.source(close, title = '元データ', group = gp_ema)
-emaLength5 = input.int(5, minval = 1, title = 'ema5期間（短期）', group = gp_ema)
-emaLength25 = input.int(25, minval = 1, title = 'ema25期間（中期）', group = gp_ema)
-emaLength50 = input.int(50, minval = 1, title = 'ema50期間（中長期）', group = gp_ema)
-emaLength100 = input.int(100, minval = 1, title = 'ema100期間（長期）', group = gp_ema)
-emaLength200 = input.int(200, minval = 1, title = 'ema200期間（超長期）', group = gp_ema)
+// パラメーター設定
+src = input.source(close, "元データ")
+res = lib.calc(src, 5, 25, 50, 100, 200, 20, 2.0, 9, 26, 52, 26)
 
-gp_bb = "ボリンジャーバンド設定"
-bbLength = input.int(20, minval = 1, title = 'BB期間', group = gp_bb)
-bbStdDev = input.float(2.0, minval = 0.1, step = 0.1, title = 'BB標準偏差', group = gp_bb)
-
-gp_ichimoku = "一目均衡表パラメータ"
-tenkanLen = input.int(9, title = '転換線期間', group = gp_ichimoku)
-kijunLen = input.int(26, title = '基準線期間', group = gp_ichimoku)
-senkouSpanB_Len = input.int(52, title = '先行スパンB期間', group = gp_ichimoku)
-displacement = input.int(26, title = '先行スパン表示ずらし期間', group = gp_ichimoku)
-
-// === EMAの計算 ===
-ema5 = cf.ema(src, emaLength5)
-ema25 = cf.ema(src, emaLength25)
-ema50 = cf.ema(src, emaLength50)
-ema100 = cf.ema(src, emaLength100)
-ema200 = cf.ema(src, emaLength200)
-
-// === ボリンジャーバンドの計算 ===
-[basis, upper, lower] = ta.bb(src, bbLength, bbStdDev)
-
-// === 一目均衡表の計算 ===
-[tenkan, kijun, senkouA, senkouB] = cf.ichimokuBasic(tenkanLen, kijunLen, senkouSpanB_Len)
-
-// --- 雲の位置を判定 ---
-inBullishCloud = close > senkouA[displacement] and close > senkouB[displacement]
-inBearishCloud = close < senkouA[displacement] and close < senkouB[displacement]
-
-// --- EMA100が向きを判定 ---
-ema100IsRising = ta.rising(ema100, 1) 
-ema100IsFalling = ta.falling(ema100, 1)
-
-// 買いの起点：5/25クロス ＋ 雲の下
-emaCrossUpTrigger = cf.emaCrossUp(src, emaLength5, emaLength25) and inBearishCloud
-// 売りの起点：5/25クロス ＋ 雲の上
-emaCrossDownTrigger = cf.emaCrossDown(src, emaLength5, emaLength25) and inBullishCloud
-
-// 状態管理（クロス後の有効期間）
-var bool isWaitingForBuyEngulfing = false
-if emaCrossUpTrigger
-    isWaitingForBuyEngulfing := true
-if emaCrossDownTrigger
-    isWaitingForBuyEngulfing := false
-
-var bool isWaitingForSellEngulfing = false
-if emaCrossDownTrigger
-    isWaitingForSellEngulfing := true
-if emaCrossUpTrigger
-    isWaitingForSellEngulfing := false
-
-// === 売買サインのロジック修正 ===
-// 連続発生する条件を定義
-emaBuyCond  = isWaitingForBuyEngulfing and ema100IsRising
-emaSellCond = isWaitingForSellEngulfing and ema100IsFalling
-
-// 前の足では条件を満たさず、現在の足で初めて満たした場合のみ真とする
-emaBuy  = emaBuyCond and not emaBuyCond[1]
-emaSell = emaSellCond and not emaSellCond[1]
-
-// 包み線の判定
-bullishEngulfing = cf.bullishEngulfing()
-bearishEngulfing = cf.bearishEngulfing()
-
-// === 出来高急騰の判定 ===
-volAvg = ta.sma(volume, 20)
-volMult = timeframe.isdaily ? 1.5 : 2.0
-volSpike = volume > volAvg * volMult
-showVolSignal = (timeframe.isdaily or timeframe.isweekly) and volSpike
 
 // ==============================
 // チャートプロット
 // ==============================
 
 // EMA
-plot(ema5, color = color.white,  title = 'ema5', linewidth = 1, display = display.none)
-plot(ema25, color = color.green,  title = 'ema25', linewidth = 1)
-plot(ema50, color = color.yellow, title = 'ema50', linewidth = 2)
-plot(ema100, color = color.orange,    title = 'ema100', linewidth = 2)
-plot(ema200, color = color.red, title = 'ema200', linewidth = 2)
+plot(res.ema5, color = color.white,  title = 'ema5', linewidth = 1, display = display.none)
+plot(res.ema25, color = color.green,  title = 'ema25', linewidth = 1)
+plot(res.ema50, color = color.yellow, title = 'ema50', linewidth = 2)
+plot(res.ema100, color = color.orange,    title = 'ema100', linewidth = 2)
+plot(res.ema200, color = color.red, title = 'ema200', linewidth = 2)
 
 // ボリンジャーバンド
-plot(basis, color = color.gray, title = 'BB Basis', display = display.none)
-p_upper = plot(upper, color = color.new(color.gray, 50), title = 'BB Upper', linewidth = 4)
-p_lower = plot(lower, color = color.new(color.gray, 50), title = 'BB Lower', linewidth = 4)
+plot(res.bbBasis, color = color.gray, title = 'BB Basis', display = display.none)
+p_upper = plot(res.bbUpper, color = color.new(color.gray, 50), title = 'BB Upper', linewidth = 4)
+p_lower = plot(res.bbLower, color = color.new(color.gray, 50), title = 'BB Lower', linewidth = 4)
 
 // 一目均衡表
-plot(tenkan, color = color.blue, title = '転換線', display = display.none)
-plot(kijun, color = color.purple, title = '基準線', display = display.none)
-plot(close, offset = -displacement, color = color.gray, title = '遅行スパン', display = display.none)
-p_senkouA = plot(senkouA, offset = displacement, color = color.teal, title = '先行スパン1')
-p_senkouB = plot(senkouB, offset = displacement, color = color.maroon, title = '先行スパン2')
-// 未来の塗りつぶし色を現在のライン位置で判定
-fill(p_senkouA, p_senkouB, color = senkouA > senkouB ? color.new(color.green, 90) : color.new(color.red, 90), title = '一目雲')
+plot(res.tenkan, color = color.blue, title = '転換線', display = display.none)
+plot(res.kijun, color = color.purple, title = '基準線', display = display.none)
+disp = 26
+p_senkouA = plot(res.senkouA, offset = disp, color = color.teal, title = '先行スパン1')
+p_senkouB = plot(res.senkouB, offset = disp, color = color.maroon, title = '先行スパン2')
+// 遅行スパン（現在の価格を26日後ろにずらす）
+plot(close, offset = -disp, color = color.gray, title = '遅行スパン', display = display.none)
+fill(p_senkouA, p_senkouB, color = res.senkouA > res.senkouB ? color.new(color.green, 90) : color.new(color.red, 90), title = '一目雲')
 
 // シグナル表示
-plotshape(emaBuy,  title = 'EMAクロス買い', location = location.belowbar, color = color.lime, style = shape.labelup, text = '買', textcolor = color.black)
-plotshape(emaSell, title = 'EMAクロス売り', location = location.abovebar, color = color.red, style = shape.labeldown, text = '売', textcolor = color.white)
-plotshape(bullishEngulfing, title = '包み線買い', location = location.belowbar, color = color.green, style = shape.triangleup, text = '包買')
-plotshape(bearishEngulfing, title = '包み線売り', location = location.abovebar, color = color.red, style = shape.triangledown, text = '包売')
-plotshape(showVolSignal, title = '出来高急騰', location = location.belowbar, style = shape.circle, size = size.tiny, color = color.fuchsia)
+plotshape(res.emaBuy,  title = 'EMAクロス買い', location = location.belowbar, color = color.lime, style = shape.labelup, text = '買', textcolor = color.black)
+plotshape(res.emaSell, title = 'EMAクロス売り', location = location.abovebar, color = color.red, style = shape.labeldown, text = '売', textcolor = color.white)
+plotshape(res.bullishEngulfing, title = '包み線買い', location = location.belowbar, color = color.green, style = shape.triangleup, text = '包買')
+plotshape(res.bearishEngulfing, title = '包み線売り', location = location.abovebar, color = color.red, style = shape.triangledown, text = '包売')
+plotshape(res.volSpike, title = '出来高急騰', location = location.belowbar, style = shape.circle, size = size.tiny, color = color.fuchsia)
 
 // === 通知機能 (alert関数) ===
 // 買いシグナル
-if emaBuy
+if res.emaBuy
     alert("【EMA】ゴールデンクロス発生 (" + syminfo.ticker + ")", alert.freq_once_per_bar_close)
 
-if bullishEngulfing
+if res.bullishEngulfing
     alert("【包み線】強気サイン発生 (" + syminfo.ticker + ")", alert.freq_once_per_bar_close)
 
 // 売りシグナル
-if emaSell
+if res.emaSell
     alert("【EMA】デッドクロス発生 (" + syminfo.ticker + ")", alert.freq_once_per_bar_close)
 
-if bearishEngulfing
+if res.bearishEngulfing
     alert("【包み線】弱気サイン発生 (" + syminfo.ticker + ")", alert.freq_once_per_bar_close)
 
 // 出来高急騰（オプション）
-if showVolSignal
+if res.volSpike
     alert("【出来高】急騰検知 (" + syminfo.ticker + ")", alert.freq_once_per_bar_close)

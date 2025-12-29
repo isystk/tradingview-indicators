@@ -1,0 +1,77 @@
+//@version=6
+// @description 複数のEMA、一目均衡表、BB、包み線を計算する共用ライブラリ
+// 
+// 概要:
+// 本インジケーターは、複数の指数移動平均（EMA）とローソク足パターン「包み線」を用いた売買シグナルを提供します。
+// 
+// 主な機能:
+// - 5本のEMA（5, 25, 50, 100, 200）をプロット
+// - EMA5とEMA25のクロスによる売買シグナルを表示
+//   ・買い：EMA5が25を上抜け ＋ 価格が雲の下
+//   ・売り：EMA5が25を下抜け ＋ 価格が雲の上
+// - ボリンジャーバンドを表示（中心線、上下バンド）
+// - 出来高が急騰したときにシグナル（●）を表示
+// - 一目均衡表を表示
+// - 上記シグナルに対応したアラート条件も設定済み
+
+library("EMA_Ichimoku_BB_Function")
+
+// 1. 戻り値用の型定義
+export type SignalResult
+    float ema5
+    float ema25
+    float ema50
+    float ema100
+    float ema200
+    float bbUpper
+    float bbLower
+    float bbBasis
+    float tenkan
+    float kijun
+    float senkouA
+    float senkouB
+    bool  emaBuy
+    bool  emaSell
+    bool  bullishEngulfing
+    bool  bearishEngulfing
+    bool  volSpike
+
+// 2. メイン計算関数のエクスポート (正しい構文)
+export calc(float src, int e5, int e25, int e50, int e100, int e200, int bbLen, float bbStd, int tLen, int kLen, int sBLen, int disp) =>
+    // EMA計算
+    e5_v   = ta.ema(src, e5)
+    e25_v  = ta.ema(src, e25)
+    e50_v  = ta.ema(src, e50)
+    e100_v = ta.ema(src, e100)
+    e200_v = ta.ema(src, e200)
+
+    // ボリンジャーバンド計算
+    [basis, upper, lower] = ta.bb(src, bbLen, bbStd)
+
+    // 一目均衡表計算
+    tk = math.avg(ta.highest(tLen), ta.lowest(tLen))
+    kj = math.avg(ta.highest(kLen), ta.lowest(kLen))
+    sa = math.avg(tk, kj)
+    sb = math.avg(ta.highest(sBLen), ta.lowest(sBLen))
+
+    // 売買ロジックの判定
+    // ※先行スパンは26日(disp)将来に描画されるため、現在の価格と比較するのは26日前の計算値
+    cloud_top    = math.max(sa[disp], sb[disp])
+    cloud_bottom = math.min(sa[disp], sb[disp])
+    
+    inBearishCloud = src < cloud_bottom
+    inBullishCloud = src > cloud_top
+    
+    eBuy  = ta.crossover(e5_v, e25_v) and inBearishCloud
+    eSell = ta.crossunder(e5_v, e25_v) and inBullishCloud
+
+    // 包み線 (Engulfing)
+    bullEng = close > open[1] and open < close[1] and close[1] < open[1]
+    bearEng = close < open[1] and open > close[1] and close[1] > open[1]
+
+    // 出来高急騰
+    volAvg = ta.sma(volume, 20)
+    vSpike = volume > volAvg * (timeframe.isdaily ? 1.5 : 2.0)
+
+    // 型に格納して返却
+    SignalResult.new(e5_v, e25_v, e50_v, e100_v, e200_v, upper, lower, basis, tk, kj, sa, sb, eBuy, eSell, bullEng, bearEng, vSpike)
