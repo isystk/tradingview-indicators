@@ -70,21 +70,21 @@ bullishEngulfing = close > open and close[1] < open[1] and low <= low[1] and clo
 bearishEngulfing = close < open and close[1] > open[1] and high >= high[1] and close <= low[1]
 
 // === チャートにE MAをプロット ===
-plot(ema1, color = color.green, title = 'EMA1', linewidth = 2)
+plot(ema1, color = color.green, title = 'EMA1', linewidth = 2, display = display.none)
 plot(ema2, color = color.yellow, title = 'EMA2', linewidth = 2)
 plot(ema3, color = color.orange, title = 'EMA3', linewidth = 2)
 plot(ema4, color = color.red, title = 'EMA4', linewidth = 2)
 plot(ema5, color = color.maroon, title = 'EMA5', linewidth = 2)
 
 // === ボリンジャーバンドをプロット ===
-plot(basis, color = color.rgb(68, 68, 68), title = 'BB Basis', linewidth = 1)
-plot(upper, color = color.rgb(94, 94, 94), title = 'BB Upper', linewidth = 1, style = plot.style_line)
-plot(lower, color = color.rgb(94, 94, 94), title = 'BB Lower', linewidth = 1, style = plot.style_line)
+plot(basis, color = color.rgb(68, 68, 68), title = 'BB Basis', linewidth = 1, display = display.none)
+plot(upper, color = color.rgb(94, 94, 94), title = 'BB Upper', linewidth = 4, style = plot.style_line)
+plot(lower, color = color.rgb(94, 94, 94), title = 'BB Lower', linewidth = 4, style = plot.style_line)
 
 // === 一目均衡表をプロット ===
-plot(tenkan, color = color.blue, title = '転換線', linewidth = 1)
-plot(kijun, color = color.purple, title = '基準線', linewidth = 1)
-plot(close, offset = -displacement, color = color.gray, title = '遅行スパン', linewidth = 1)
+plot(tenkan, color = color.blue, title = '転換線', linewidth = 1, display = display.none)
+plot(kijun, color = color.purple, title = '基準線', linewidth = 1, display = display.none)
+plot(close, offset = -displacement, color = color.gray, title = '遅行スパン', linewidth = 1, display = display.none)
 senkouA_plot = plot(senkouA, offset = displacement, color = color.teal, title = '先行スパン1', linewidth = 1)
 senkouB_plot = plot(senkouB, offset = displacement, color = color.maroon, title = '先行スパン2', linewidth = 1)
 fill(senkouA_plot, senkouB_plot, color = senkouA > senkouB ? color.new(color.green, 85) : color.new(color.red, 85), title = '一目雲')
