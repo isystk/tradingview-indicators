@@ -5,9 +5,10 @@
 // 本インジケーターは、複数の指数移動平均（EMA）とローソク足パターン「包み線」を用いた売買シグナルを提供します。
 // 
 // 主な機能:
-// - 4本のEMA（短期・中期・長期・超長期）をプロット
-// - EMA1（短期）とEMA2（中期）のクロスによる売買シグナル表示
-// - 「包み線」パターン（ヒゲも含む）の検出による売買シグナル表示
+// - 5本のEMA（5, 25, 50, 100, 200）をプロット
+// - EMA5とEMA25のクロスによる売買シグナルを表示
+//   ・買い：EMA5が25を上抜け ＋ 価格が雲の上 ＋ 価格がEMA200の上
+//   ・売り：EMA5が25を下抜け ＋ 価格が雲の下 ＋ 価格がEMA200の下
 // - ボリンジャーバンドを表示（中心線、上下バンド）
 // - 出来高が急騰したときにシグナル（●）を表示
 // - 一目均衡表を表示
@@ -21,11 +22,11 @@ import ise0615/CommonFunctions/2 as cf
 // === パラメーター設定 (Group化で整理) ===
 gp_ema = "EMA設定"
 src = input.source(close, title = '元データ', group = gp_ema)
-emaLength1 = input.int(5, minval = 1, title = 'EMA1期間（短期）', group = gp_ema)
-emaLength2 = input.int(25, minval = 1, title = 'EMA2期間（中期）', group = gp_ema)
-emaLength3 = input.int(50, minval = 1, title = 'EMA3期間（長期）', group = gp_ema)
-emaLength4 = input.int(100, minval = 1, title = 'EMA4期間（長期2）', group = gp_ema)
-emaLength5 = input.int(200, minval = 1, title = 'EMA5期間（超長期）', group = gp_ema)
+emaLength5 = input.int(5, minval = 1, title = 'ema5期間（短期）', group = gp_ema)
+emaLength25 = input.int(25, minval = 1, title = 'ema25期間（中期）', group = gp_ema)
+emaLength50 = input.int(50, minval = 1, title = 'ema50期間（中長期）', group = gp_ema)
+emaLength100 = input.int(100, minval = 1, title = 'ema100期間（長期）', group = gp_ema)
+emaLength200 = input.int(200, minval = 1, title = 'ema200期間（超長期）', group = gp_ema)
 
 gp_bb = "ボリンジャーバンド設定"
 bbLength = input.int(20, minval = 1, title = 'BB期間', group = gp_bb)
@@ -38,11 +39,11 @@ senkouSpanB_Len = input.int(52, title = '先行スパンB期間', group = gp_ich
 displacement = input.int(26, title = '先行スパン表示ずらし期間', group = gp_ichimoku)
 
 // === EMAの計算 ===
-ema1 = cf.ema(src, emaLength1)
-ema2 = cf.ema(src, emaLength2)
-ema3 = cf.ema(src, emaLength3)
-ema4 = cf.ema(src, emaLength4)
 ema5 = cf.ema(src, emaLength5)
+ema25 = cf.ema(src, emaLength25)
+ema50 = cf.ema(src, emaLength50)
+ema100 = cf.ema(src, emaLength100)
+ema200 = cf.ema(src, emaLength200)
 
 // === ボリンジャーバンドの計算 ===
 [basis, upper, lower] = ta.bb(src, bbLength, bbStdDev)
@@ -51,8 +52,15 @@ ema5 = cf.ema(src, emaLength5)
 [tenkan, kijun, senkouA, senkouB] = cf.ichimokuBasic(tenkanLen, kijunLen, senkouSpanB_Len)
 
 // === 売買サインの判定 ===
-emaBuy  = cf.emaCrossUp(src, emaLength1, emaLength2)
-emaSell = cf.emaCrossDown(src, emaLength1, emaLength2)
+// 1. 雲との位置関係 (現在値が雲より上か下か)
+inBullishCloud = close > senkouA[displacement] and close > senkouB[displacement]
+inBearishCloud = close < senkouA[displacement] and close < senkouB[displacement]
+// 2. 長期EMA(200)との位置関係
+aboveLongTermEma = close > ema200
+belowLongTermEma = close < ema200
+// 単なるクロスではなく、長期トレンド（雲・200EMA）と同じ方向のクロスのみ採用
+emaBuy  = cf.emaCrossUp(src, emaLength5, emaLength25) and inBullishCloud and aboveLongTermEma
+emaSell = cf.emaCrossDown(src, emaLength5, emaLength25) and inBearishCloud and belowLongTermEma
 bullishEngulfing = cf.bullishEngulfing()
 bearishEngulfing = cf.bearishEngulfing()
 
@@ -67,16 +75,16 @@ showVolSignal = (timeframe.isdaily or timeframe.isweekly) and volSpike
 // ==============================
 
 // EMA
-plot(ema1, color = color.white,  title = 'EMA1', display = display.none)
-plot(ema2, color = color.green,  title = 'EMA2', linewidth = 2)
-plot(ema3, color = color.yellow, title = 'EMA3', linewidth = 2)
-plot(ema4, color = color.red,    title = 'EMA4', linewidth = 2)
-plot(ema5, color = color.orange, title = 'EMA5', linewidth = 2)
+plot(ema5, color = color.white,  title = 'ema5', linewidth = 1, display = display.none)
+plot(ema25, color = color.green,  title = 'ema25', linewidth = 1)
+plot(ema50, color = color.yellow, title = 'ema50', linewidth = 2)
+plot(ema100, color = color.orange,    title = 'ema100', linewidth = 2)
+plot(ema200, color = color.red, title = 'ema200', linewidth = 2)
 
 // ボリンジャーバンド
 plot(basis, color = color.gray, title = 'BB Basis', display = display.none)
-p_upper = plot(upper, color = color.new(color.gray, 50), title = 'BB Upper', linewidth = 2)
-p_lower = plot(lower, color = color.new(color.gray, 50), title = 'BB Lower', linewidth = 2)
+p_upper = plot(upper, color = color.new(color.gray, 50), title = 'BB Upper', linewidth = 4)
+p_lower = plot(lower, color = color.new(color.gray, 50), title = 'BB Lower', linewidth = 4)
 
 // 一目均衡表
 plot(tenkan, color = color.blue, title = '転換線', display = display.none)
@@ -112,4 +120,3 @@ if bearishEngulfing
 // 出来高急騰（オプション）
 if showVolSignal
     alert("【出来高】急騰検知 (" + syminfo.ticker + ")", alert.freq_once_per_bar_close)
-    
