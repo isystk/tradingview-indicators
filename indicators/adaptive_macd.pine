@@ -34,61 +34,56 @@ slowLength_fast = input.int(13, minval = 1, title = 'MACD 長期 EMA（高感度
 signalSmoothing_fast = input.int(5, minval = 1, title = 'MACD シグナル平滑化（高感度）')
 
 // ボリンジャーバンド設定
-bbLength = input.int(20, title = 'ボリンジャーバンド期間')
+bbLength = input.int(20, title = 'BB期間 (ボラティリティ測定用)')
 bbMult = input.float(2.0, title = 'BB標準偏差倍率')
-bbWidthThreshold = input.float(0.1, title = 'BB幅の閾値（基準線の何倍か）') // 0.1 = 10%
+bbWidthThreshold = input.float(0.1, title = '高感度モードへ移行するBB幅閾値') 
 
-// === BB幅による切り替え判定 ===
+// === BB幅によるブレンド比率（Weight）の計算 ===
 bbBasis = ta.sma(src, bbLength)
 bbStd = ta.stdev(src, bbLength)
 bbUpper = bbBasis + bbMult * bbStd
 bbLower = bbBasis - bbMult * bbStd
 bbWidth = bbUpper - bbLower
-bbWidthRatio = bbWidth / bbBasis // 基準線比の相対幅
-useFastMACD = bbWidthRatio > bbWidthThreshold
+bbWidthRatio = bbWidth / bbBasis
 
-// === MACD（通常）===
-fastMA_normal = ta.ema(src, fastLength)
-slowMA_normal = ta.ema(src, slowLength)
-macd_normal = fastMA_normal - slowMA_normal
+// 判定を滑らかにするため、比率そのものをEMAで平滑化
+smoothRatio = ta.ema(bbWidthRatio, 5)
+
+// ブレンド比率 (0.0 = 通常MACD, 1.0 = 高感度MACD)
+// math.clamp の代用: 最小0, 最大1に収める
+rawWeight = (smoothRatio / bbWidthThreshold) - 0.5
+blendWeight = math.max(0.0, math.min(1.0, rawWeight))
+
+// === 各MACDの計算 ===
+macd_normal = ta.ema(src, fastLength) - ta.ema(src, slowLength)
 signal_normal = ta.ema(macd_normal, signalSmoothing)
-hist_normal = macd_normal - signal_normal
 
-// === MACD（高感度）===
-fastMA_fast = ta.ema(src, fastLength_fast)
-slowMA_fast = ta.ema(src, slowLength_fast)
-macd_fast = fastMA_fast - slowMA_fast
+macd_fast = ta.ema(src, fastLength_fast) - ta.ema(src, slowLength_fast)
 signal_fast = ta.ema(macd_fast, signalSmoothing_fast)
-hist_fast = macd_fast - signal_fast
 
-// === 切り替えによるMACD最終値 ===
-macd_final = useFastMACD ? macd_fast : macd_normal
-signal_final = useFastMACD ? signal_fast : signal_normal
-hist_final = macd_final - signal_final
+// === 線形補間（math.lerp）の代用計算 ===
+// 数式: A * (1 - w) + B * w
+macd_final   = macd_normal * (1 - blendWeight) + macd_fast * blendWeight
+signal_final = signal_normal * (1 - blendWeight) + signal_fast * blendWeight
+hist_final   = macd_final - signal_final
 
 // === 売買シグナル ===
 bullishCross = ta.crossover(macd_final, signal_final)
 bearishCross = ta.crossunder(macd_final, signal_final)
 
 // === プロット ===
-plot(macd_final, title = '可変MACD', color = color.orange, linewidth = 1)
+plot(macd_final, title = '可変MACD', color = color.orange, linewidth = 2)
 plot(signal_final, title = 'シグナル', color = color.teal, linewidth = 1)
 plot(hist_final, title = 'ヒストグラム', style = plot.style_columns, color = hist_final >= 0 ? color.new(color.lime, 30) : color.new(color.red, 30))
 
-// === RSI 背景色追加（強弱を濃さで表現, 基準40・60） ===
+// === RSI 背景色追加 ===
 rsiLength = input.int(14, title = 'RSI期間')
 rsi = ta.rsi(src, rsiLength)
-
-// RSI が 0 ～ 40 の範囲で強さを算出
-lowStrength = math.max(0, (40 - rsi) / 40) // 0～1
-// RSI が 60 ～ 100 の範囲で強さを算出
-highStrength = math.max(0, (rsi - 60) / 40) // 0～1
-
-// 強さに応じて透明度を計算（0=不透明、90=かなり薄い）
+lowStrength = math.max(0, (40 - rsi) / 40)
+highStrength = math.max(0, (rsi - 60) / 40)
 lowTransp = 90 - lowStrength * 90
 highTransp = 90 - highStrength * 90
 
-// 背景色プロット
 bgcolor(rsi <= 40 ? color.new(color.red, lowTransp) : na)
 bgcolor(rsi >= 60 ? color.new(color.green, highTransp) : na)
 
