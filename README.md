@@ -20,7 +20,11 @@
 - TradingView
 - Pine Script v5 / v6（※コード内の @version を参照）
 
-![デモ画像](./demo.png "デモ画像")
+「EMA + 一目均衡表 + BB」インジケータ
+![EMA + 一目均衡表 + BB](./ema_ichimoku_bb.pine.png "EMA + 一目均衡表 + BB")
+
+EMA + 一目均衡表 + BB ストラテジー
+![EMA + 一目均衡表 + BB ストラテジー](./ema_ichimoku_bb_strategy.png "EMA + 一目均衡表 + BB ストラテジー")
 
 ---
 

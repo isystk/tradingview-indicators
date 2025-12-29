@@ -6,9 +6,9 @@
 // 
 // 主な機能:
 // - 5本のEMA（5, 25, 50, 100, 200）をプロット
-// - EMA5とEMA25のクロスによる売買シグナルを表示
-//   ・買い：EMA5が25を上抜け ＋ 価格が雲の下
-//   ・売り：EMA5が25を下抜け ＋ 価格が雲の上
+// - EMAクロスと包み線、長期トレンドを組み合わせた売買シグナルを表示
+//   ・買い：EMA5が25を上抜け（雲の下で発生）後、EMA100が上昇中に「陽の包み線」が出現
+//   ・売り：EMA5が25を下抜け（雲の上で発生）後、EMA100が下落中に「陰の包み線」が出現
 // - ボリンジャーバンドを表示（中心線、上下バンド）
 // - 出来高が急騰したときにシグナル（●）を表示
 // - 一目均衡表を表示
@@ -51,15 +51,41 @@ ema200 = cf.ema(src, emaLength200)
 // === 一目均衡表の計算 ===
 [tenkan, kijun, senkouA, senkouB] = cf.ichimokuBasic(tenkanLen, kijunLen, senkouSpanB_Len)
 
-// === 売買サインの判定 ===
-//  雲との位置関係 (現在値が雲より上か下か)
+// --- 雲の位置を判定 ---
 inBullishCloud = close > senkouA[displacement] and close > senkouB[displacement]
 inBearishCloud = close < senkouA[displacement] and close < senkouB[displacement]
-// 雲の下でのEMAゴールデンクロス、雲の上でのデッドクロス
-emaBuy  = cf.emaCrossUp(src, emaLength5, emaLength25) and inBearishCloud
-emaSell = cf.emaCrossDown(src, emaLength5, emaLength25) and inBullishCloud
+
+// --- EMA100が向きを判定 ---
+ema100IsRising = ta.rising(ema100, 1) 
+ema100IsFalling = ta.falling(ema100, 1)
+
+// 買いの起点：5/25クロス ＋ 雲の下
+emaCrossUpTrigger = cf.emaCrossUp(src, emaLength5, emaLength25) and inBearishCloud
+// 売りの起点：5/25クロス ＋ 雲の上
+emaCrossDownTrigger = cf.emaCrossDown(src, emaLength5, emaLength25) and inBullishCloud
+
+// 状態管理（クロス後の有効期間）
+var bool isWaitingForBuyEngulfing = false
+if emaCrossUpTrigger
+    isWaitingForBuyEngulfing := true
+if emaCrossDownTrigger
+    isWaitingForBuyEngulfing := false
+
+var bool isWaitingForSellEngulfing = false
+if emaCrossDownTrigger
+    isWaitingForSellEngulfing := true
+if emaCrossUpTrigger
+    isWaitingForSellEngulfing := false
+
+// 包み線の判定
 bullishEngulfing = cf.bullishEngulfing()
 bearishEngulfing = cf.bearishEngulfing()
+
+// === 新しい売買サイン（100MAフィルター追加） ===
+// 買い：条件合致中 ＋ 包み線 ＋ 100MAが上向き
+emaBuy  = isWaitingForBuyEngulfing and bullishEngulfing and ema100IsRising
+// 売り：条件合致中 ＋ 包み線 ＋ 100MAが下向き（※ご希望に合わせて下向き条件にしています）
+emaSell = isWaitingForSellEngulfing and bearishEngulfing and ema100IsFalling
 
 // === 出来高急騰の判定 ===
 volAvg = ta.sma(volume, 20)
