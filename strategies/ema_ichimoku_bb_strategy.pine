@@ -1,79 +1,123 @@
 //@version=6
-strategy('EMA + 一目均衡表 + BB ストラテジー', overlay = true, initial_capital = 1000000, default_qty_type = strategy.percent_of_equity, default_qty_value = 10)
+// ================================================================================
+// ■ ストラテジー名: EMA + 一目均衡表 + BB トレンドフォロー戦略
+// ================================================================================
+// 【戦略の概要】
+// 本ストラテジーは、トレンドの「押し目買い」および「戻り売り」を狙う設計です。
+// 一目均衡表の「雲」を長期的な価格の過熱感（または位置関係）のフィルターとして使い、
+// 短期・中期のEMA（指数移動平均線）の交差でエントリータイミングを計ります。
+// 
+// 【エントリー論理】
+// 1. 買い（Long）:
+//    - 条件A: 価格が「一目均衡表の雲の下」にあること（売られすぎ・反転の期待）
+//    - 条件B: EMA5がEMA25を上に突き抜ける（短期的な勢いの転換）
+//    - 条件C: 上記クロス発生後、長期のEMA100が「上昇」していること（トレンドの追認）
+//    ※「雲の下」でのクロスは、深い押し目からの回復を狙う形になります。
+// 
+// 2. 売り（Short）:
+//    - 条件A: 価格が「一目均衡表の雲の上」にあること（買われすぎ・反転の期待）
+//    - 条件B: EMA5がEMA25を下に突き抜ける（短期的な勢いの転換）
+//    - 条件C: 上記クロス発生後、長期のEMA100が「下落」していること（トレンドの追認）
+// 
+// 【決済論理（利確・損切り共通）】
+// - 買い決済: EMA5がEMA25を下に突き抜けた（デッドクロス）タイミングで全決済。
+// - 売り決済: EMA5がEMA25を上に突き抜けた（ゴールデンクロス）タイミングで全決済。
+//   ※短期的な勢いが弱まったところで、確実に利益（または最小限の損失）を確定させます。
+// 
+// 【推奨される環境】
+// - 時間足: 1時間足、4時間足、日足（トレンドが明確な時間軸）
+// - 市場: トレンドが発生しやすい通貨ペア、指数、またはボラティリティのある銘柄
+// ================================================================================
 
-// ===== library import =====
-import ise0615/CommonFunctions/2 as cf
+strategy('EMA + 一目均衡表 + BB ストラテジー', overlay = true, initial_capital = 1000000, default_qty_type = strategy.percent_of_equity, default_qty_value = 10)
 
 // === パラメーター設定 ===
 gp_ema = "EMA設定"
 src = input.source(close, title = '元データ', group = gp_ema)
-emaLength5   = input.int(5, title = 'ema5期間', group = gp_ema)
-emaLength25  = input.int(25, title = 'ema25期間', group = gp_ema)
-emaLength100 = input.int(100, title = 'ema100期間', group = gp_ema)
+emaLength5 = input.int(5, minval = 1, title = 'ema5期間（短期）', group = gp_ema)
+emaLength25 = input.int(25, minval = 1, title = 'ema25期間（中期）', group = gp_ema)
+emaLength100 = input.int(100, minval = 1, title = 'ema100期間（長期）', group = gp_ema)
 
 gp_ichimoku = "一目均衡表パラメータ"
 tenkanLen = input.int(9, title = '転換線期間', group = gp_ichimoku)
 kijunLen = input.int(26, title = '基準線期間', group = gp_ichimoku)
 senkouSpanB_Len = input.int(52, title = '先行スパンB期間', group = gp_ichimoku)
-displacement = input.int(26, title = '表示ずらし', group = gp_ichimoku)
+displacement = input.int(26, title = '先行スパン表示ずらし期間', group = gp_ichimoku)
+
+gp_strat = "ストラテジー設定"
+useShort = input.bool(true, "空売り（Short）を有効にする", group = gp_strat)
 
 // === インジケーター計算 ===
-ema5   = cf.ema(src, emaLength5)
-ema25  = cf.ema(src, emaLength25)
-ema100 = cf.ema(src, emaLength100)
+// EMA（指数移動平均）
+ema5 = ta.ema(src, emaLength5)
+ema25 = ta.ema(src, emaLength25)
+ema100 = ta.ema(src, emaLength100)
 
-[tenkan, kijun, senkouA, senkouB] = cf.ichimokuBasic(tenkanLen, kijunLen, senkouSpanB_Len)
+// 一目均衡表（標準的な計算式）
+donchian(len) => math.avg(ta.lowest(len), ta.highest(len))
+tenkan = donchian(tenkanLen)
+kijun = donchian(kijunLen)
+senkouA = math.avg(tenkan, kijun)
+senkouB = donchian(senkouSpanB_Len)
 
-// --- 条件判定 ---
-// 1. 雲の位置判定（先行スパンはdisplacement分前に描画されているため、現在の価格と比較）
+// --- ロジック判定 ---
+// 現在の価格と雲の位置関係（遅行スパン等を考慮せず、現在価格で判定）
 inBullishCloud = close > senkouA[displacement] and close > senkouB[displacement]
 inBearishCloud = close < senkouA[displacement] and close < senkouB[displacement]
 
-// 2. EMA100のトレンド判定
-ema100IsRising  = ta.rising(ema100, 1) 
+// EMA100のトレンド方向
+ema100IsRising = ta.rising(ema100, 1) 
 ema100IsFalling = ta.falling(ema100, 1)
 
-// 3. クロス＋雲の条件（トリガーの準備）
-emaCrossUpTrigger   = cf.emaCrossUp(src, emaLength5, emaLength25) and inBearishCloud
-emaCrossDownTrigger = cf.emaCrossDown(src, emaLength5, emaLength25) and inBullishCloud
+// 短期クロスのシグナル
+emaCrossUp   = ta.crossover(ema5, ema25)
+emaCrossDown = ta.crossunder(ema5, ema25)
 
-// --- 状態管理（クロス発生からサインが出るまで維持） ---
-var bool isWaitingForBuy  = false
-if emaCrossUpTrigger
+// 状態管理用フラグ（クロスが発生した後に条件を満たすまで待機するため）
+var bool isWaitingForBuy = false
+if emaCrossUp and inBearishCloud
     isWaitingForBuy := true
-if strategy.position_size > 0 or emaCrossDownTrigger // エントリー後、または逆クロスでリセット
+if emaCrossDown
     isWaitingForBuy := false
 
 var bool isWaitingForSell = false
-if emaCrossDownTrigger
+if emaCrossDown and inBullishCloud
     isWaitingForSell := true
-if strategy.position_size < 0 or emaCrossUpTrigger // エントリー後、または逆クロスでリセット
+if emaCrossUp
     isWaitingForSell := false
 
-// 4. 包み線の判定
-bullishEngulfing = cf.bullishEngulfing()
-bearishEngulfing = cf.bearishEngulfing()
+// 最終的なエントリートリガー
+buySignal  = isWaitingForBuy and ema100IsRising and not (isWaitingForBuy[1] and ema100IsRising[1])
+sellSignal = isWaitingForSell and ema100IsFalling and not (isWaitingForSell[1] and ema100IsFalling[1])
 
-// === エントリー条件 ===
-longCondition  = isWaitingForBuy  and bullishEngulfing and ema100IsRising
-shortCondition = isWaitingForSell and bearishEngulfing and ema100IsFalling
+// === バックテスト実行 ===
 
-// === エントリー実行 ===
-if longCondition
-    strategy.entry("Long", strategy.long, comment="EMA_Cross_Buy")
+// --- 買い（Long） ---
+if buySignal
+    strategy.entry("Long", strategy.long, comment="Entry: EMA Gold Cross (Under Cloud)")
 
-if shortCondition
-    strategy.entry("Short", strategy.short, comment="EMA_Cross_Sell")
+// 買い決済（デッドクロス）
+if strategy.position_size > 0 and emaCrossDown
+    strategy.close("Long", comment="Exit: EMA Dead Cross")
 
-// === 決済条件 (例: 逆のクロスが発生したら決済) ===
-if ta.crossunder(ema5, ema25)
-    strategy.close("Long", comment="Exit_Long")
+// --- 売り（Short） ---
+if useShort
+    if sellSignal
+        strategy.entry("Short", strategy.short, comment="Entry: EMA Dead Cross (Over Cloud)")
+    
+    // 売り決済（ゴールデンクロス）
+    if strategy.position_size < 0 and emaCrossUp
+        strategy.close("Short", comment="Exit: EMA Gold Cross")
 
-if ta.crossover(ema5, ema25)
-    strategy.close("Short", comment="Exit_Short")
+// === チャートプロット ===
+plot(ema5, color = color.white, title = 'Short EMA (5)', linewidth = 1)
+plot(ema25, color = color.green, title = 'Medium EMA (25)', linewidth = 1)
+plot(ema100, color = color.orange, title = 'Long EMA (100)', linewidth = 2)
 
-// === チャート描画 (確認用) ===
-plot(ema100, color = color.orange, title = 'ema100', linewidth = 2)
-p_senkouA = plot(senkouA, offset = displacement, color = color.teal, title = '先行スパン1')
-p_senkouB = plot(senkouB, offset = displacement, color = color.maroon, title = '先行スパン2')
-fill(p_senkouA, p_senkouB, color = senkouA > senkouB ? color.new(color.green, 90) : color.new(color.red, 90))
+p_senkouA = plot(senkouA, offset = displacement, color = color.new(color.teal, 50), title = 'Senkou A')
+p_senkouB = plot(senkouB, offset = displacement, color = color.new(color.maroon, 50), title = 'Senkou B')
+fill(p_senkouA, p_senkouB, color = senkouA > senkouB ? color.new(color.green, 90) : color.new(color.red, 90), title = "Ichimoku Cloud")
+
+// シグナルの視覚化
+plotshape(buySignal, location = location.belowbar, color = color.lime, style = shape.triangleup, size = size.small, title = "Buy Signal")
+plotshape(sellSignal, location = location.abovebar, color = color.red, style = shape.triangledown, size = size.small, title = "Sell Signal")

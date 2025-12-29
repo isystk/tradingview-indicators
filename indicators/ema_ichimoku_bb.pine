@@ -6,9 +6,9 @@
 // 
 // 主な機能:
 // - 5本のEMA（5, 25, 50, 100, 200）をプロット
-// - EMAクロスと包み線、長期トレンドを組み合わせた売買シグナルを表示
-//   ・買い：EMA5が25を上抜け（雲の下で発生）後、EMA100が上昇中に「陽の包み線」が出現
-//   ・売り：EMA5が25を下抜け（雲の上で発生）後、EMA100が下落中に「陰の包み線」が出現
+// - EMAクロスと長期トレンドを組み合わせた売買シグナルを表示
+//   ・買い：EMA5が25を上抜け（雲の下で発生）後、EMA100が上昇中
+//   ・売り：EMA5が25を下抜け（雲の上で発生）後、EMA100が下落中
 // - ボリンジャーバンドを表示（中心線、上下バンド）
 // - 出来高が急騰したときにシグナル（●）を表示
 // - 一目均衡表を表示
@@ -77,15 +77,18 @@ if emaCrossDownTrigger
 if emaCrossUpTrigger
     isWaitingForSellEngulfing := false
 
+// === 売買サインのロジック修正 ===
+// 連続発生する条件を定義
+emaBuyCond  = isWaitingForBuyEngulfing and ema100IsRising
+emaSellCond = isWaitingForSellEngulfing and ema100IsFalling
+
+// 前の足では条件を満たさず、現在の足で初めて満たした場合のみ真とする
+emaBuy  = emaBuyCond and not emaBuyCond[1]
+emaSell = emaSellCond and not emaSellCond[1]
+
 // 包み線の判定
 bullishEngulfing = cf.bullishEngulfing()
 bearishEngulfing = cf.bearishEngulfing()
-
-// === 新しい売買サイン（100MAフィルター追加） ===
-// 買い：条件合致中 ＋ 包み線 ＋ 100MAが上向き
-emaBuy  = isWaitingForBuyEngulfing and bullishEngulfing and ema100IsRising
-// 売り：条件合致中 ＋ 包み線 ＋ 100MAが下向き（※ご希望に合わせて下向き条件にしています）
-emaSell = isWaitingForSellEngulfing and bearishEngulfing and ema100IsFalling
 
 // === 出来高急騰の判定 ===
 volAvg = ta.sma(volume, 20)
