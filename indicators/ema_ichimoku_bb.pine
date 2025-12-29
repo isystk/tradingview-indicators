@@ -7,8 +7,8 @@
 // 主な機能:
 // - 5本のEMA（5, 25, 50, 100, 200）をプロット
 // - EMA5とEMA25のクロスによる売買シグナルを表示
-//   ・買い：EMA5が25を上抜け ＋ 価格が雲の上 ＋ 価格がEMA200の上
-//   ・売り：EMA5が25を下抜け ＋ 価格が雲の下 ＋ 価格がEMA200の下
+//   ・買い：EMA5が25を上抜け ＋ 価格が雲の下
+//   ・売り：EMA5が25を下抜け ＋ 価格が雲の上
 // - ボリンジャーバンドを表示（中心線、上下バンド）
 // - 出来高が急騰したときにシグナル（●）を表示
 // - 一目均衡表を表示
@@ -52,15 +52,12 @@ ema200 = cf.ema(src, emaLength200)
 [tenkan, kijun, senkouA, senkouB] = cf.ichimokuBasic(tenkanLen, kijunLen, senkouSpanB_Len)
 
 // === 売買サインの判定 ===
-// 1. 雲との位置関係 (現在値が雲より上か下か)
+//  雲との位置関係 (現在値が雲より上か下か)
 inBullishCloud = close > senkouA[displacement] and close > senkouB[displacement]
 inBearishCloud = close < senkouA[displacement] and close < senkouB[displacement]
-// 2. 長期EMA(200)との位置関係
-aboveLongTermEma = close > ema200
-belowLongTermEma = close < ema200
-// 単なるクロスではなく、長期トレンド（雲・200EMA）と同じ方向のクロスのみ採用
-emaBuy  = cf.emaCrossUp(src, emaLength5, emaLength25) and inBullishCloud and aboveLongTermEma
-emaSell = cf.emaCrossDown(src, emaLength5, emaLength25) and inBearishCloud and belowLongTermEma
+// 雲の下でのEMAゴールデンクロス、雲の上でのデッドクロス
+emaBuy  = cf.emaCrossUp(src, emaLength5, emaLength25) and inBearishCloud
+emaSell = cf.emaCrossDown(src, emaLength5, emaLength25) and inBullishCloud
 bullishEngulfing = cf.bullishEngulfing()
 bearishEngulfing = cf.bearishEngulfing()
 
