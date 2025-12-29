@@ -1,49 +1,104 @@
 //@version=6
 // Author: Yoshitaka Ise
 // Library: Common Functions
-// Version: 1.0.0
+// Version: 1.0.1
 
+/// @description テクニカル分析で頻繁に使用する汎用的な計算ロジックをまとめたライブラリです。
 library('CommonFunctions')
 
 // ===== Trend判定 =====
+
+/// @function isBullTrend
+/// @description 短期EMAが長期EMAより上に位置しているか（上昇トレンド）を判定します。
+/// @param src 計算に使用するデータ系列（通常は close）
+/// @param shortLen 短期EMAの期間
+/// @param longLen 長期EMAの期間
+/// @returns true: 上昇トレンド / false: それ以外
 export isBullTrend(series float src, int shortLen, int longLen) =>
     ta.ema(src, shortLen) > ta.ema(src, longLen)
 
+/// @function isBearTrend
+/// @description 短期EMAが長期EMAより下に位置しているか（下降トレンド）を判定します。
+/// @param src 計算に使用するデータ系列
+/// @param shortLen 短期EMAの期間
+/// @param longLen 長期EMAの期間
+/// @returns true: 下降トレンド / false: それ以外
 export isBearTrend(series float src, int shortLen, int longLen) =>
     ta.ema(src, shortLen) < ta.ema(src, longLen)
 
 // ===== ボラティリティ判定 =====
+
+/// @function atrFilter
+/// @description 現在のATRが指定した閾値を超えているか判定します。
+/// @param len ATRの期間
+/// @param threshold 判定の基準となる数値
+/// @returns true: ボラティリティが高い / false: 低い
 export atrFilter(int len, float threshold) =>
     ta.atr(len) > threshold
 
 // ===== EMA =====
+
+/// @function ema
+/// @description 指数移動平均（EMA）を計算します。
+/// @param src 計算に使用するデータ系列
+/// @param len EMAの期間
+/// @returns 計算されたEMAの値
 export ema(series float src, int len) =>
     ta.ema(src, len)
 
+/// @function emaCrossUp
+/// @description 短期EMAが長期EMAを上に突き抜けたか（ゴールデンクロス）を判定します。
+/// @param src 計算に使用するデータ系列
+/// @param shortLen 短期EMAの期間
+/// @param longLen 長期EMAの期間
+/// @returns true: クロス発生時のみ
 export emaCrossUp(series float src, int shortLen, int longLen) =>
     ta.crossover(ta.ema(src, shortLen), ta.ema(src, longLen))
 
+/// @function emaCrossDown
+/// @description 短期EMAが長期EMAを下に突き抜けたか（デッドクロス）を判定します。
+/// @param src 計算に使用するデータ系列
+/// @param shortLen 短期EMAの期間
+/// @param longLen 長期EMAの期間
+/// @returns true: クロス発生時のみ
 export emaCrossDown(series float src, int shortLen, int longLen) =>
     ta.crossunder(ta.ema(src, shortLen), ta.ema(src, longLen))
 
 // ===== Engulfing Pattern (wick included) =====
-// 引数がない場合はそのままでOKですが、戻り値は series bool になります
+
+/// @function bullishEngulfing
+/// @description 「包み足（陽線）」を判定します。前の足のヒゲを含めて現在の陽線が包み込んでいる状態を検知します。
+/// @returns true: 強気の包み足発生
 export bullishEngulfing() =>
     close > open and close[1] < open[1] and low <= low[1] and close >= high[1]
 
+/// @function bearishEngulfing
+/// @description 「包み足（陰線）」を判定します。前の足のヒゲを含めて現在の陰線が包み込んでいる状態を検知します。
+/// @returns true: 弱気の包み足発生
 export bearishEngulfing() =>
     close < open and close[1] > open[1] and high >= high[1] and close <= low[1]
 
 // ===== Volume Spike =====
+
+/// @function volumeSpike
+/// @description 出来高が過去の平均に対して急増したかを判定します。
+/// @param multiplier 平均の何倍を閾値とするか
+/// @param maLen 出来高平均を算出する期間
+/// @returns true: 出来高急騰時
 export volumeSpike(float multiplier, int maLen) =>
     volume > ta.sma(volume, maLen) * multiplier
 
-// ===== Ichimoku =====
-export tenkan(int len) =>
-    (ta.highest(high, len) + ta.lowest(low, len)) / 2
+// ===== 一目均衡表 =====
 
-export kijun(int len) =>
-    (ta.highest(high, len) + ta.lowest(low, len)) / 2
-
-export senkouB(int len) =>
-    (ta.highest(high, len) + ta.lowest(low, len)) / 2
+/// @function ichimokuBasic
+/// @description 一目均衡表の主要4ライン（転換、基準、先行A、先行B）を一括で計算します。
+/// @param tLen 転換線の期間（通常 9）
+/// @param kLen 基準線の期間（通常 26）
+/// @param sBLen 先行スパンBの期間（通常 52）
+/// @returns [転換線, 基準線, 先行スパンA, 先行スパンB] のタプル
+export ichimokuBasic(int tLen, int kLen, int sBLen) =>
+    t = (ta.highest(high, tLen) + ta.lowest(low, tLen)) / 2
+    k = (ta.highest(high, kLen) + ta.lowest(low, kLen)) / 2
+    sA = (t + k) / 2
+    sB = (ta.highest(high, sBLen) + ta.lowest(low, sBLen)) / 2
+    [t, k, sA, sB]
