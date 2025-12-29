@@ -95,13 +95,21 @@ plotshape(bearishEngulfing, title = '包み線売り', location = location.above
 plotshape(showVolSignal, title = '出来高急騰', location = location.belowbar, style = shape.circle, size = size.tiny, color = color.fuchsia)
 
 // === 通知機能 (alert関数) ===
+// 買いシグナル
 if emaBuy
-    alert("【EMA】ゴールデンクロス発生: " + syminfo.ticker, alert.freq_once_per_bar_close)
-if emaSell
-    alert("【EMA】デッドクロス発生: " + syminfo.ticker, alert.freq_once_per_bar_close)
-if bullishEngulfing
-    alert("【包み線】強気サイン発生: " + syminfo.ticker, alert.freq_once_per_bar_close)
+    alert("【EMA】ゴールデンクロス発生 (" + syminfo.ticker + ")", alert.freq_once_per_bar_close)
 
-// === 従来のアラート条件設定 ===
-alertcondition(emaBuy,  title = 'EMAクロス買い', message = 'EMA買いシグナル')
-alertcondition(emaSell, title = 'EMAクロス売り', message = 'EMA売りシグナル')
+if bullishEngulfing
+    alert("【包み線】強気サイン発生 (" + syminfo.ticker + ")", alert.freq_once_per_bar_close)
+
+// 売りシグナル
+if emaSell
+    alert("【EMA】デッドクロス発生 (" + syminfo.ticker + ")", alert.freq_once_per_bar_close)
+
+if bearishEngulfing
+    alert("【包み線】弱気サイン発生 (" + syminfo.ticker + ")", alert.freq_once_per_bar_close)
+
+// 出来高急騰（オプション）
+if showVolSignal
+    alert("【出来高】急騰検知 (" + syminfo.ticker + ")", alert.freq_once_per_bar_close)
+    
