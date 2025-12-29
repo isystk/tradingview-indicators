@@ -25,13 +25,36 @@ res = lib.calc(src, 5, 25, 50, 100, 200, 20, 2.0, 9, 26, 52, 26)
 
 
 // ==============================
-// ストラテジー
+// ストラテジー（半値戻し指値エントリー）
 // ==============================
 
-// 買いシグナル
+// 買いシグナル：点灯した足の「高値と安値の真ん中」に指値を置く
 if res.emaBuy
-    strategy.entry("Long", strategy.long)
+    float halfPriceLong = (high + low) / 2
+    strategy.entry("Long", strategy.long, limit = halfPriceLong)
 
-// 売りシグナル
+// 売りシグナル：点灯した足の「高値と安値の真ん中」に指値を置く
 if res.emaSell
-    strategy.entry("Short", strategy.short)
+    float halfPriceShort = (high + low) / 2
+    strategy.entry("Short", strategy.short, limit = halfPriceShort)
+
+
+// ==============================
+// 利確・損切設定
+// ==============================
+
+// 比率の設定（0.05 = 2%, 0.10 = 5%）
+stopLossPercent   = 0.02
+takeProfitPercent = 0.05
+
+// 買いポジションの決済条件
+if strategy.position_size > 0
+    float longStopPrice   = strategy.position_avg_price * (1 - stopLossPercent)
+    float longProfitPrice = strategy.position_avg_price * (1 + takeProfitPercent)
+    strategy.exit("Long Exit", "Long", stop = longStopPrice, limit = longProfitPrice)
+
+// 売りポジションの決済条件
+if strategy.position_size < 0
+    float shortStopPrice   = strategy.position_avg_price * (1 + stopLossPercent)
+    float shortProfitPrice = strategy.position_avg_price * (1 - takeProfitPercent)
+    strategy.exit("Short Exit", "Short", stop = shortStopPrice, limit = shortProfitPrice)
