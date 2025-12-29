@@ -1,17 +1,49 @@
-//@version=5
+//@version=6
 // Author: Yoshitaka Ise
 // Library: Common Functions
 // Version: 1.0.0
 
-library("CommonFunctions")
+library('CommonFunctions')
 
 // ===== Trend判定 =====
-export isBullTrend(src, shortLen, longLen) =>
+export isBullTrend(series float src, int shortLen, int longLen) =>
     ta.ema(src, shortLen) > ta.ema(src, longLen)
 
-export isBearTrend(src, shortLen, longLen) =>
+export isBearTrend(series float src, int shortLen, int longLen) =>
     ta.ema(src, shortLen) < ta.ema(src, longLen)
 
 // ===== ボラティリティ判定 =====
-export atrFilter(len, threshold) =>
+export atrFilter(int len, float threshold) =>
     ta.atr(len) > threshold
+
+// ===== EMA =====
+export ema(series float src, int len) =>
+    ta.ema(src, len)
+
+export emaCrossUp(series float src, int shortLen, int longLen) =>
+    ta.crossover(ta.ema(src, shortLen), ta.ema(src, longLen))
+
+export emaCrossDown(series float src, int shortLen, int longLen) =>
+    ta.crossunder(ta.ema(src, shortLen), ta.ema(src, longLen))
+
+// ===== Engulfing Pattern (wick included) =====
+// 引数がない場合はそのままでOKですが、戻り値は series bool になります
+export bullishEngulfing() =>
+    close > open and close[1] < open[1] and low <= low[1] and close >= high[1]
+
+export bearishEngulfing() =>
+    close < open and close[1] > open[1] and high >= high[1] and close <= low[1]
+
+// ===== Volume Spike =====
+export volumeSpike(float multiplier, int maLen) =>
+    volume > ta.sma(volume, maLen) * multiplier
+
+// ===== Ichimoku =====
+export tenkan(int len) =>
+    (ta.highest(high, len) + ta.lowest(low, len)) / 2
+
+export kijun(int len) =>
+    (ta.highest(high, len) + ta.lowest(low, len)) / 2
+
+export senkouB(int len) =>
+    (ta.highest(high, len) + ta.lowest(low, len)) / 2

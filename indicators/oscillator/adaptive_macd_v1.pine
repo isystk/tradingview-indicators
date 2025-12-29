@@ -1,4 +1,4 @@
-//@version=5
+//@version=6
 // インジケーター名: 「可変MACDインジケーター」
 // 
 // 概要:
@@ -18,25 +18,25 @@
 // 可変MACDラインがゼロラインより上の場合はロング推奨
 // 可変MACDラインがゼロラインより下の場合はショート推奨
 
-indicator("可変MACDインジケーター", overlay=false)
+indicator('可変MACDインジケーター', overlay = false)
 
 // === 入力パラメータ ===
-src = input.source(close, title="元データ")
+src = input.source(close, title = '元データ')
 
 // 通常MACD
-fastLength = input.int(12, minval=1, title="MACD 短期 EMA（通常）")
-slowLength = input.int(26, minval=1, title="MACD 長期 EMA（通常）")
-signalSmoothing = input.int(9, minval=1, title="MACD シグナル平滑化（通常）")
+fastLength = input.int(12, minval = 1, title = 'MACD 短期 EMA（通常）')
+slowLength = input.int(26, minval = 1, title = 'MACD 長期 EMA（通常）')
+signalSmoothing = input.int(9, minval = 1, title = 'MACD シグナル平滑化（通常）')
 
 // 高感度MACD
-fastLength_fast = input.int(6, minval=1, title="MACD 短期 EMA（高感度）")
-slowLength_fast = input.int(13, minval=1, title="MACD 長期 EMA（高感度）")
-signalSmoothing_fast = input.int(5, minval=1, title="MACD シグナル平滑化（高感度）")
+fastLength_fast = input.int(6, minval = 1, title = 'MACD 短期 EMA（高感度）')
+slowLength_fast = input.int(13, minval = 1, title = 'MACD 長期 EMA（高感度）')
+signalSmoothing_fast = input.int(5, minval = 1, title = 'MACD シグナル平滑化（高感度）')
 
 // ボリンジャーバンド設定
-bbLength = input.int(20, title="ボリンジャーバンド期間")
-bbMult = input.float(2.0, title="BB標準偏差倍率")
-bbWidthThreshold = input.float(0.1, title="BB幅の閾値（基準線の何倍か）")  // 0.1 = 10%
+bbLength = input.int(20, title = 'ボリンジャーバンド期間')
+bbMult = input.float(2.0, title = 'BB標準偏差倍率')
+bbWidthThreshold = input.float(0.1, title = 'BB幅の閾値（基準線の何倍か）') // 0.1 = 10%
 
 // === BB幅による切り替え判定 ===
 bbBasis = ta.sma(src, bbLength)
@@ -44,7 +44,7 @@ bbStd = ta.stdev(src, bbLength)
 bbUpper = bbBasis + bbMult * bbStd
 bbLower = bbBasis - bbMult * bbStd
 bbWidth = bbUpper - bbLower
-bbWidthRatio = bbWidth / bbBasis  // 基準線比の相対幅
+bbWidthRatio = bbWidth / bbBasis // 基準線比の相対幅
 useFastMACD = bbWidthRatio > bbWidthThreshold
 
 // === MACD（通常）===
@@ -62,36 +62,36 @@ signal_fast = ta.ema(macd_fast, signalSmoothing_fast)
 hist_fast = macd_fast - signal_fast
 
 // === 切り替えによるMACD最終値 ===
-macd_final   = useFastMACD ? macd_fast   : macd_normal
+macd_final = useFastMACD ? macd_fast : macd_normal
 signal_final = useFastMACD ? signal_fast : signal_normal
-hist_final   = macd_final - signal_final
+hist_final = macd_final - signal_final
 
 // === 売買シグナル ===
 bullishCross = ta.crossover(macd_final, signal_final)
 bearishCross = ta.crossunder(macd_final, signal_final)
 
 // === プロット ===
-plot(macd_final, title="可変MACD", color=color.orange, linewidth=1)
-plot(signal_final, title="シグナル", color=color.teal, linewidth=1)
-plot(hist_final, title="ヒストグラム", style=plot.style_columns, color=hist_final >= 0 ? color.new(color.lime, 30) : color.new(color.red, 30))
+plot(macd_final, title = '可変MACD', color = color.orange, linewidth = 1)
+plot(signal_final, title = 'シグナル', color = color.teal, linewidth = 1)
+plot(hist_final, title = 'ヒストグラム', style = plot.style_columns, color = hist_final >= 0 ? color.new(color.lime, 30) : color.new(color.red, 30))
 
 // === RSI 背景色追加（強弱を濃さで表現, 基準40・60） ===
-rsiLength = input.int(14, title="RSI期間")
+rsiLength = input.int(14, title = 'RSI期間')
 rsi = ta.rsi(src, rsiLength)
 
 // RSI が 0 ～ 40 の範囲で強さを算出
-lowStrength  = math.max(0, (40 - rsi) / 40)   // 0～1
+lowStrength = math.max(0, (40 - rsi) / 40) // 0～1
 // RSI が 60 ～ 100 の範囲で強さを算出
-highStrength = math.max(0, (rsi - 60) / 40)  // 0～1
+highStrength = math.max(0, (rsi - 60) / 40) // 0～1
 
 // 強さに応じて透明度を計算（0=不透明、90=かなり薄い）
-lowTransp  = 90 - (lowStrength  * 90)
-highTransp = 90 - (highStrength * 90)
+lowTransp = 90 - lowStrength * 90
+highTransp = 90 - highStrength * 90
 
 // 背景色プロット
-bgcolor(rsi <= 40 ? color.new(color.red,   lowTransp)  : na)
+bgcolor(rsi <= 40 ? color.new(color.red, lowTransp) : na)
 bgcolor(rsi >= 60 ? color.new(color.green, highTransp) : na)
 
 // === アラート ===
-alertcondition(bullishCross, title="買いシグナル発生", message="【可変MACD】買いシグナル発生")
-alertcondition(bearishCross, title="売りシグナル発生", message="【可変MACD】売りシグナル発生")
+alertcondition(bullishCross, title = '買いシグナル発生', message = '【可変MACD】買いシグナル発生')
+alertcondition(bearishCross, title = '売りシグナル発生', message = '【可変MACD】売りシグナル発生')

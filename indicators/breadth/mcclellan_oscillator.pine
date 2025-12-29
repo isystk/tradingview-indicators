@@ -1,46 +1,24 @@
-//@version=5
-// インジケーター名: 「マクレラン・オシレーター（カスタム・スケール版）」
-// 
-// 概要:
-// 本インジケーターは、市場の幅（マーケット・ブレス）を測定する「マクレラン・オシレーター」を計算します。
-// 値上がり銘柄数と値下がり銘柄数の差（A-D Line）の短期・長期EMAの差を表示し、市場の過熱感や資金流入を可視化します。
-//
-// 主な機能:
-// - 外部シンボル（騰落銘柄数データ）の読み込みに対応
-// - 短期・長期EMAの期間をカスタマイズ可能
-// - シグナルラインおよびヒストグラムの表示切り替え
-// - ゼロライン基準のヒストグラム彩色（強気/弱気の視認性向上）
-// - 右上に現在の値を表示するステータステーブルを表示
-//
-// 利用目的:
-// 指数（S&P500等）が上昇していても、値上がり銘柄数が減っているような「ダイバージェンス（逆行現象）」を
-// 早期に発見し、トレンドの持続性や天井・底の兆しを判断するために使用します。
-//
-// 設定方法:
-// - A-D symbol: 騰落銘柄数（Advances - Declines）のデータがある場合に入力
-// - Advances/Declines symbol: 値上がり銘柄数と値下がり銘柄数を個別に指定する場合に入力
-//   (例: NYSEの場合は「NYSE:ADV」と「NYSE:DEC」など)
-
-indicator("McClellan Oscillator (custom scale)", shorttitle="McClellan Osc", overlay=false, scale=scale.right)
+//@version=6
+indicator('McClellan Oscillator (custom scale)', shorttitle = 'McClellan Osc', overlay = false, scale = scale.right)
 
 // --- 入力 ---
-adSymbol = input.symbol("", "A−D symbol (もしあれば)")
-advSymbol = input.symbol("", "Advances symbol")
-decSymbol = input.symbol("", "Declines symbol")
-tf = input.timeframe("", "Timeframe (empty = chart)")
+adSymbol = input.symbol('', 'A−D symbol (もしあれば)')
+advSymbol = input.symbol('', 'Advances symbol')
+decSymbol = input.symbol('', 'Declines symbol')
+tf = input.timeframe('', 'Timeframe (empty = chart)')
 
-shortLen = input.int(19, "Short EMA length", minval=1)
-longLen  = input.int(39, "Long EMA length", minval=1)
-signalLen = input.int(9, "Signal EMA length (optional)")
-showSignal = input.bool(true, "Show signal EMA")
-showHistogram = input.bool(true, "Show histogram")
-histBase = input.bool(true, "Zero-based histogram (color by sign)")
-obLevel = input.float(50.0, "Upper threshold line")
-osLevel = input.float(-50.0, "Lower threshold line")
+shortLen = input.int(19, 'Short EMA length', minval = 1)
+longLen = input.int(39, 'Long EMA length', minval = 1)
+signalLen = input.int(9, 'Signal EMA length (optional)')
+showSignal = input.bool(true, 'Show signal EMA')
+showHistogram = input.bool(true, 'Show histogram')
+histBase = input.bool(true, 'Zero-based histogram (color by sign)')
+obLevel = input.float(50.0, 'Upper threshold line')
+osLevel = input.float(-50.0, 'Lower threshold line')
 
 // --- ヘルパー ---
 getSeries(sym) =>
-    sym == "" ? na : request.security(sym, tf == "" ? timeframe.period : tf, close)
+    sym == '' ? na : request.security(sym, tf == '' ? timeframe.period : tf, close)
 
 // --- 明示的な宣言（型を固定） ---
 var float ad = na
@@ -48,15 +26,18 @@ var float adv = na
 var float dec = na
 
 // --- A-D の決定 ---
-if adSymbol != ""
+if adSymbol != ''
     ad := getSeries(adSymbol)
+    ad
 else
-    if advSymbol != "" and decSymbol != ""
+    if advSymbol != '' and decSymbol != ''
         adv := getSeries(advSymbol)
-        dec  := getSeries(decSymbol)
-        ad := (na(adv) or na(dec)) ? na : adv - dec
+        dec := getSeries(decSymbol)
+        ad := na(adv) or na(dec) ? na : adv - dec
+        ad
     else
-        ad := close - open  // fallback
+        ad := close - open // fallback
+        ad
 
 // --- 計算 ---
 osc = na(ad) ? na : ta.ema(ad, shortLen) - ta.ema(ad, longLen)
@@ -65,16 +46,16 @@ sig = na(osc) or signalLen <= 0 ? na : ta.ema(osc, signalLen)
 // --- 描画 ---
 posColor = color.new(color.green, 0)
 negColor = color.new(color.red, 0)
-histColor = histBase ? (osc >= 0 ? posColor : negColor) : color.gray
+histColor = histBase ? osc >= 0 ? posColor : negColor : color.gray
 
 // ✅ ここが重要：plot() は if の外に出して、条件式で制御する
-plot(showHistogram ? osc : na, title="McClellan Oscillator", style=plot.style_columns, color=histColor, linewidth=1)
-plot(showSignal ? sig : na, title="Signal EMA", color=color.blue, linewidth=2)
+plot(showHistogram ? osc : na, title = 'McClellan Oscillator', style = plot.style_columns, color = histColor, linewidth = 1)
+plot(showSignal ? sig : na, title = 'Signal EMA', color = color.blue, linewidth = 2)
 
 // 補助ライン
-hline(0, "Zero", color=color.gray)
-hline(obLevel, "Upper Threshold", color=color.silver, linestyle=hline.style_dashed)
-hline(osLevel, "Lower Threshold", color=color.silver, linestyle=hline.style_dashed)
+hline(0, 'Zero', color = color.gray)
+hline(obLevel, 'Upper Threshold', color = color.silver, linestyle = hline.style_dashed)
+hline(osLevel, 'Lower Threshold', color = color.silver, linestyle = hline.style_dashed)
 
 // シグナルクロス
 // plotshape(ta.crossover(osc, sig), title="Bullish cross", location=location.top, style=shape.triangleup, size=size.tiny, color=color.green)
@@ -83,6 +64,6 @@ hline(osLevel, "Lower Threshold", color=color.silver, linestyle=hline.style_dash
 // 情報表示テーブル
 var table info = table.new(position.top_right, 1, 3)
 if barstate.islast
-    table.cell(info, 0, 0, "McClellan Osc: " + (na(osc) ? "n/a" : str.tostring(osc, "#.##")))
-    table.cell(info, 0, 1, "Signal: " + (na(sig) ? "n/a" : str.tostring(sig, "#.##")))
-    table.cell(info, 0, 2, "A−D: " + (na(ad) ? "n/a" : str.tostring(ad, "#.##")))
+    table.cell(info, 0, 0, 'McClellan Osc: ' + (na(osc) ? 'n/a' : str.tostring(osc, '#.##')))
+    table.cell(info, 0, 1, 'Signal: ' + (na(sig) ? 'n/a' : str.tostring(sig, '#.##')))
+    table.cell(info, 0, 2, 'A−D: ' + (na(ad) ? 'n/a' : str.tostring(ad, '#.##')))
