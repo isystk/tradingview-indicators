@@ -12,7 +12,6 @@
 // - ボリンジャーバンドを表示（中心線、上下バンド）
 // - 出来高が急騰したときにシグナル（●）を表示
 // - 一目均衡表を表示
-// - 上記シグナルに対応したアラート条件も設定済み
 
 strategy('EMA + 一目均衡表 + BB（ストラテジー）', overlay = true, initial_capital = 1000000, default_qty_type = strategy .percent_of_equity, default_qty_value = 100)
 
@@ -21,8 +20,29 @@ import ise0615/EMA_Ichimoku_BB_Function/2 as lib
 
 // パラメーター設定
 src = input.source(close, "元データ")
-res = lib.calc(src, 5, 25, 50, 100, 200, 20, 2.0, 9, 26, 52, 26)
 
+// EMA期間設定
+grp_ema = "EMA 設定"
+ema_len1 = input.int(5,   "EMA 1", minval=1, group=grp_ema)
+ema_len2 = input.int(25,  "EMA 2", minval=1, group=grp_ema)
+ema_len3 = input.int(50,  "EMA 3", minval=1, group=grp_ema)
+ema_len4 = input.int(100, "EMA 4", minval=1, group=grp_ema)
+ema_len5 = input.int(200, "EMA 5", minval=1, group=grp_ema)
+
+// ボリンジャーバンド設定
+grp_bb = "ボリンジャーバンド 設定"
+bb_len  = input.int(20,    "BB 期間", minval=1, group=grp_bb)
+bb_mult = input.float(2.0, "BB 標準偏差", minval=0.1, step=0.1, group=grp_bb)
+
+// 一目均衡表設定
+grp_ichi = "一目均衡表 設定"
+ichi_tenkan = input.int(9,  "転換線 期間", minval=1, group=grp_ichi)
+ichi_kijun  = input.int(26, "基準線 期間", minval=1, group=grp_ichi)
+ichi_senkou = input.int(52, "先行スパンB 期間", minval=1, group=grp_ichi)
+ichi_disp   = input.int(26, "先行スパン変位 (Offset)", minval=1, group=grp_ichi)
+
+// ライブラリ計算の実行
+res = lib.calc(src, ema_len1, ema_len2, ema_len3, ema_len4, ema_len5, bb_len, bb_mult, ichi_tenkan, ichi_kijun, ichi_senkou, ichi_disp)
 
 // ==============================
 // ストラテジー（半値戻し指値エントリー）
