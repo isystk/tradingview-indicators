@@ -1,117 +1,82 @@
 //@version=6
-// インジケーター名: 「EMA + 一目均衡表 + BB（ストラテジー）」
+// インジケーター名: 「可変MACD（ストラテジー）」
 // 
 // 概要:
-// 本インジケーターは、複数の指数移動平均（EMA）とローソク足パターン「包み線」を用いた売買シグナルを提供します。
-// 
+// 相場のボラティリティ（BB幅）の変化に応じて、標準的なMACD設定と、初動を捉えるための高感度設定を
+// 動的に合成（ブレンド）して表示する適応型インジケーターです。
+// ボラティリティ上昇時には高感度モードへの重みが増し、トレンド転換を早期に視覚化します。
+//
 // 主な機能:
-// - 5本のEMA（5, 25, 50, 100, 200）をプロット
-// - EMA5とEMA25のクロスによる売買シグナルを表示
-//   ・買い：EMA5が25を上抜け ＋ 価格が雲の下
-//   ・売り：EMA5が25を下抜け ＋ 価格が雲の上
-// - ボリンジャーバンドを表示（中心線、上下バンド）
-// - 出来高が急騰したときにシグナル（●）を表示
-// - 一目均衡表を表示
+// - デュアル計算エンジン: 通常設定と高感度設定のMACDをバックグラウンドで同時計算。
+// - 適応型ブレンド: BB幅の閾値に基づき、2つのMACDの結果を線形補間で滑らかに結合。
+// - ダイナミックRSI背景: 40以下/60以上の過熱領域において、端に近づくほど色が濃くなるグラデーション背景。
+// - スマートアラート: 合成後のMACDラインとシグナルのクロスを検知し、銘柄名付きで通知。
 
-strategy('EMA + 一目均衡表 + BB（ストラテジー）', overlay = true, initial_capital = 1000000, default_qty_type = strategy .percent_of_equity, default_qty_value = 20)
+strategy('可変MACD（ストラテジー）', overlay = false, initial_capital = 1000000, default_qty_type = strategy .percent_of_equity, default_qty_value = 20)
 
-// ===== library import =====
-import ise0615/EMA_Ichimoku_BB_Function/2 as lib
-
-// パラメーター設定
-src = input.source(close, "元データ")
-
-// EMA期間設定
-grp_ema = "EMA 設定"
-ema_len1 = input.int(5,   "EMA 1", minval=1, group=grp_ema)
-ema_len2 = input.int(25,  "EMA 2", minval=1, group=grp_ema)
-ema_len3 = input.int(50,  "EMA 3", minval=1, group=grp_ema)
-ema_len4 = input.int(100, "EMA 4", minval=1, group=grp_ema)
-ema_len5 = input.int(200, "EMA 5", minval=1, group=grp_ema)
-
-// ボリンジャーバンド設定
-grp_bb = "ボリンジャーバンド 設定"
-bb_len  = input.int(20,    "BB 期間", minval=1, group=grp_bb)
-bb_mult = input.float(2.0, "BB 標準偏差", minval=0.1, step=0.1, group=grp_bb)
-
-// 一目均衡表設定
-grp_ichi = "一目均衡表 設定"
-ichi_tenkan = input.int(9,  "転換線 期間", minval=1, group=grp_ichi)
-ichi_kijun  = input.int(26, "基準線 期間", minval=1, group=grp_ichi)
-ichi_senkou = input.int(52, "先行スパンB 期間", minval=1, group=grp_ichi)
-ichi_disp   = input.int(26, "先行スパン変位 (Offset)", minval=1, group=grp_ichi)
-
-// 決済設定
-grp_sl = "損切設定"
-sl_buffer = input.float(0.02,  "損切のバッファ", minval=0, step=0.01, group=grp_sl)
-
-// ライブラリ計算の実行
-res = lib.calc(src, ema_len1, ema_len2, ema_len3, ema_len4, ema_len5, bb_len, bb_mult, ichi_tenkan, ichi_kijun, ichi_senkou, ichi_disp)
-
-// EMA
-plot(res.ema100, color = color.orange,    title = 'ema100', linewidth = 2)
-plot(res.ema200, color = color.red, title = 'ema200', linewidth = 2)
-
-// シグナル表示
-plotshape(res.emaBuy,  title = 'EMAクロス買い', location = location.belowbar, color = color.lime, style = shape.labelup, text = '買', textcolor = color.black)
-plotshape(res.emaSell, title = 'EMAクロス売り', location = location.abovebar, color = color.red, style = shape.labeldown, text = '売', textcolor = color.white)
+import ise0615/Adaptive_Mac_Function/1 as lib
 
 // ==============================
-// ストラテジー変数と設定
+// 入力パラメータ
 // ==============================
-var float longStopPrice = na
-var float shortStopPrice = na
-ema5  = ta.ema(src, ema_len1)
-ema25 = ta.ema(src, ema_len2)
+src = input.source(close, title = '元データ')
+
+grp_mac_n = "通常MACD 設定"
+f_n = input.int(12, "通常短期", group=grp_mac_n)
+s_n = input.int(26, "通常長期", group=grp_mac_n)
+sig_n = input.int(9, "通常シグナル", group=grp_mac_n)
+
+grp_mac_f = "高感度MACD 設定"
+f_f = input.int(6, "高感度短期", group=grp_mac_f)
+s_f = input.int(13, "高感度長期", group=grp_mac_f)
+sig_f = input.int(5, "高感度シグナル", group=grp_mac_f)
+
+grp_bb = "BB 設定"
+bbL = input.int(20, "BB期間", group=grp_bb)
+bbM = input.float(2.0, "BB偏差", group=grp_bb)
+bbThr = input.float(0.1, "移行閾値", group=grp_bb)
+
+grp_exit = "利確・損切 設定"
+useExit  = input.bool(true, "利確・損切を使用する", group=grp_exit)
+tpPerc   = input.float(3.0, "利確 (Take Profit %)", minval=0.0, step=0.1, group=grp_exit) / 100
+slPerc   = input.float(1.5, "損切 (Stop Loss %)", minval=0.0, step=0.1, group=grp_exit) / 100
+
+// 計算呼び出し
+res = lib.calc(src, f_n, s_n, sig_n, f_f, s_f, sig_f, bbL, bbM, bbThr)
+
+// ==============================
+// チャートプロット
+// ==============================
+
+plot(res.macd, '可変MACD', color.orange, 2)
+plot(res.signal, 'シグナル', color.teal, 1)
+plot(res.hist, 'ヒストグラム', style=plot.style_columns, color=res.hist >= 0 ? color.new(color.lime, 30) : color.new(color.red, 30))
 
 // ==============================
 // エントリーロジック
 // ==============================
 
 // 買いシグナル
-if res.emaBuy
-    // 損切：安値(low)からさらに2%下
-    longStopPrice := low * (1 - sl_buffer) 
-    // 成行でエントリー
-    strategy.entry("Long", strategy.long) 
+if res.bullishCross
+    strategy.entry("Long", strategy.long, comment="MACD Cross Up")
 
 // 売りシグナル
-if res.emaSell
-    // 損切：高値(high)からさらに2%上
-    shortStopPrice := high * (1 + sl_buffer)
-    // 成行でエントリー
-    strategy.entry("Short", strategy.short) 
+if res.bearishCross
+    strategy.entry("Short", strategy.short, comment="MACD Cross Down")
 
 // ==============================
 // 決済ロジック
 // ==============================
 
-// --- 買いポジション ---
-if strategy.position_size > 0
-    // 利確1：EMAの逆クロス (EMA5が25を下抜け)
-    exit_ema_cross = ta.crossunder(ema5, ema25)
-    // 利確2：反対の売りサイン(res.emaSell)が点灯した場合
-    exit_signal = res.emaSell
+if useExit
+    // ロングポジションの決済
+    strategy.exit("Exit Long", "Long", 
+                 limit = strategy.position_avg_price * (1 + tpPerc), 
+                 stop  = strategy.position_avg_price * (1 - slPerc),
+                 comment_loss = "SL Long", comment_profit = "TP Long")
     
-    if exit_ema_cross or exit_signal
-        strategy.close("Long", comment = exit_signal ? "TP Signal" : "TP Cross")
-    
-    // 損切：全戻し-バッファ
-    strategy.exit("Long SL", "Long", stop = longStopPrice, comment="SL Full")
-
-// --- 売りポジション ---
-if strategy.position_size < 0
-    // 利確1：EMAの逆クロス (EMA5が25を上抜け)
-    exit_ema_cross = ta.crossover(ema5, ema25)
-    // 利確2：反対の買いサイン(res.emaBuy)が点灯した場合
-    exit_signal = res.emaBuy
-    
-    if exit_ema_cross or exit_signal
-        strategy.close("Short", comment = exit_signal ? "TP Signal" : "TP Cross")
-    
-    // 損切：全戻し+バッファ
-    strategy.exit("Short SL", "Short", stop = shortStopPrice, comment="SL Full")
-
-// 損切ラインの描画
-plot(strategy.position_size > 0 ? longStopPrice : na, color=color.red, style=plot.style_linebr, linewidth=2, title="Long SL (Full-2%)")
-plot(strategy.position_size < 0 ? shortStopPrice : na, color=color.orange, style=plot.style_linebr, linewidth=2, title="Short SL (Full+2%)")
+    // ショートポジションの決済
+    strategy.exit("Exit Short", "Short", 
+                 limit = strategy.position_avg_price * (1 - tpPerc), 
+                 stop  = strategy.position_avg_price * (1 + slPerc),
+                 comment_loss = "SL Short", comment_profit = "TP Short")

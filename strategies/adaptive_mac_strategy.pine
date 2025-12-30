@@ -1,5 +1,5 @@
 //@version=6
-// インジケーター名: 「可変MACD（インジケーター）」
+// インジケーター名: 「可変MACD（ストラテジー）」
 // 
 // 概要:
 // 相場のボラティリティ（BB幅）の変化に応じて、標準的なMACD設定と、初動を捉えるための高感度設定を
@@ -12,7 +12,7 @@
 // - ダイナミックRSI背景: 40以下/60以上の過熱領域において、端に近づくほど色が濃くなるグラデーション背景。
 // - スマートアラート: 合成後のMACDラインとシグナルのクロスを検知し、銘柄名付きで通知。
 
-indicator('可変MACD（インジケーター）', overlay = false)
+strategy('可変MACD（ストラテジー）', overlay = false, initial_capital = 1000000, default_qty_type = strategy .percent_of_equity, default_qty_value = 20)
 
 import ise0615/Adaptive_Mac_Function/1 as lib
 
@@ -36,6 +36,11 @@ bbL = input.int(20, "BB期間", group=grp_bb)
 bbM = input.float(2.0, "BB偏差", group=grp_bb)
 bbThr = input.float(0.1, "移行閾値", group=grp_bb)
 
+grp_exit = "利確・損切 設定"
+useExit  = input.bool(true, "利確・損切を使用する", group=grp_exit)
+tpPerc   = input.float(3.0, "利確 (Take Profit %)", minval=0.0, step=0.1, group=grp_exit) / 100
+slPerc   = input.float(1.5, "損切 (Stop Loss %)", minval=0.0, step=0.1, group=grp_exit) / 100
+
 // 計算呼び出し
 res = lib.calc(src, f_n, s_n, sig_n, f_f, s_f, sig_f, bbL, bbM, bbThr)
 
@@ -47,21 +52,32 @@ plot(res.macd, '可変MACD', color.orange, 2)
 plot(res.signal, 'シグナル', color.teal, 1)
 plot(res.hist, 'ヒストグラム', style=plot.style_columns, color=res.hist >= 0 ? color.new(color.lime, 30) : color.new(color.red, 30))
 
-// RSI
-rsiLength = input.int(14, title = 'RSI期間')
-rsi = ta.rsi(src, rsiLength)
-lowStrength = math.max(0, (40 - rsi) / 40)
-highStrength = math.max(0, (rsi - 60) / 40)
-lowTransp = 90 - lowStrength * 90
-highTransp = 90 - highStrength * 90
-bgcolor(rsi <= 40 ? color.new(color.red, lowTransp) : na)
-bgcolor(rsi >= 60 ? color.new(color.green, highTransp) : na)
+// ==============================
+// エントリーロジック
+// ==============================
 
-// === アラート (alert関数) ===
-// 買いシグナル：ゴールデンクロス時
+// 買いエントリー (MACDゴールデンクロス)
 if res.bullishCross
-    alert("【可変MACD】買いシグナル発生 (" + syminfo.ticker + ")", alert.freq_once_per_bar_close)
+    strategy.entry("Long", strategy.long, comment="MACD Cross Up")
 
-// 売りシグナル：デッドクロス時
+// 売りエントリー (MACDデッドクロス)
 if res.bearishCross
-    alert("【可変MACD】売りシグナル発生 (" + syminfo.ticker + ")", alert.freq_once_per_bar_close)
+    strategy.entry("Short", strategy.short, comment="MACD Cross Down")
+
+// ==============================
+// 決済ロジック
+// ==============================
+
+// 利確・損切の注文（決済ロジック）
+if useExit
+    // ロングポジションの決済
+    strategy.exit("Exit Long", "Long", 
+                 limit = strategy.position_avg_price * (1 + tpPerc), 
+                 stop  = strategy.position_avg_price * (1 - slPerc),
+                 comment_loss = "SL Long", comment_profit = "TP Long")
+    
+    // ショートポジションの決済
+    strategy.exit("Exit Short", "Short", 
+                 limit = strategy.position_avg_price * (1 - tpPerc), 
+                 stop  = strategy.position_avg_price * (1 + slPerc),
+                 comment_loss = "SL Short", comment_profit = "TP Short")

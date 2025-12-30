@@ -1,0 +1,42 @@
+//@version=6
+// @description ボラティリティに応じて通常版と高感度版のMACDをブレンドするライブラリ
+library("Adaptive_Mac_Function")
+
+// 戻り値用の型定義
+export type MacdResult
+    float macd
+    float signal
+    float hist
+    bool  bullishCross
+    bool  bearishCross
+    float blendWeight
+
+// メイン計算関数
+export calc(float src, int f_n, int s_n, int sig_n, int f_f, int s_f, int sig_f, int bbL, float bbM, float bbThr) =>
+    // --- ボラティリティ（BB幅）によるブレンド比率計算 ---
+    bbBasis = ta.sma(src, bbL)
+    bbStd   = ta.stdev(src, bbL)
+    bbWidthRatio = ( (bbBasis + bbM * bbStd) - (bbBasis - bbM * bbStd) ) / bbBasis
+    
+    // 比率を平滑化し、0.0〜1.0の範囲にクランプ
+    smoothRatio = ta.ema(bbWidthRatio, 5)
+    rawWeight   = (smoothRatio / bbThr) - 0.5
+    weight      = math.max(0.0, math.min(1.0, rawWeight))
+
+    // --- 各MACDの計算 ---
+    m_n = ta.ema(src, f_n) - ta.ema(src, s_n)
+    s_n_val = ta.ema(m_n, sig_n)
+
+    m_f = ta.ema(src, f_f) - ta.ema(src, s_f)
+    s_f_val = ta.ema(m_f, sig_f)
+
+    // --- 線形補間（ブレンド） ---
+    m_final = m_n * (1 - weight) + m_f * weight
+    s_final = s_n_val * (1 - weight) + s_f_val * weight
+    h_final = m_final - s_final
+
+    // --- シグナル判定 ---
+    bull = ta.crossover(m_final, s_final)
+    bear = ta.crossunder(m_final, s_final)
+
+    MacdResult.new(m_final, s_final, h_final, bull, bear, weight)

@@ -18,10 +18,11 @@ indicator('EMA + 一目均衡表 + BB', overlay = true)
 // ===== library import =====
 import ise0615/EMA_Ichimoku_BB_Function/2 as lib
 
-// パラメーター設定
+// ==============================
+// 入力パラメータ
+// ==============================
 src = input.source(close, "元データ")
 
-// EMA期間設定
 grp_ema = "EMA 設定"
 ema_len1 = input.int(5,   "EMA 1", minval=1, group=grp_ema)
 ema_len2 = input.int(25,  "EMA 2", minval=1, group=grp_ema)
@@ -29,12 +30,10 @@ ema_len3 = input.int(50,  "EMA 3", minval=1, group=grp_ema)
 ema_len4 = input.int(100, "EMA 4", minval=1, group=grp_ema)
 ema_len5 = input.int(200, "EMA 5", minval=1, group=grp_ema)
 
-// ボリンジャーバンド設定
 grp_bb = "ボリンジャーバンド 設定"
 bb_len  = input.int(20,    "BB 期間", minval=1, group=grp_bb)
 bb_mult = input.float(2.0, "BB 標準偏差", minval=0.1, step=0.1, group=grp_bb)
 
-// 一目均衡表設定
 grp_ichi = "一目均衡表 設定"
 ichi_tenkan = input.int(9,  "転換線 期間", minval=1, group=grp_ichi)
 ichi_kijun  = input.int(26, "基準線 期間", minval=1, group=grp_ichi)
