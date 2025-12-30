@@ -13,7 +13,7 @@
 // - 出来高が急騰したときにシグナル（●）を表示
 // - 一目均衡表を表示
 
-strategy('EMA + 一目均衡表 + BB（ストラテジー）', overlay = true, initial_capital = 1000000, default_qty_type = strategy .percent_of_equity, default_qty_value = 100)
+strategy('EMA + 一目均衡表 + BB（ストラテジー）', overlay = true, initial_capital = 1000000, default_qty_type = strategy .percent_of_equity, default_qty_value = 20)
 
 // ===== library import =====
 import ise0615/EMA_Ichimoku_BB_Function/2 as lib
@@ -41,40 +41,77 @@ ichi_kijun  = input.int(26, "基準線 期間", minval=1, group=grp_ichi)
 ichi_senkou = input.int(52, "先行スパンB 期間", minval=1, group=grp_ichi)
 ichi_disp   = input.int(26, "先行スパン変位 (Offset)", minval=1, group=grp_ichi)
 
+// 決済設定
+grp_sl = "損切設定"
+sl_buffer = input.float(0.02,  "損切のバッファ", minval=0, step=0.01, group=grp_sl)
+
 // ライブラリ計算の実行
 res = lib.calc(src, ema_len1, ema_len2, ema_len3, ema_len4, ema_len5, bb_len, bb_mult, ichi_tenkan, ichi_kijun, ichi_senkou, ichi_disp)
 
+// EMA
+plot(res.ema100, color = color.orange,    title = 'ema100', linewidth = 2)
+plot(res.ema200, color = color.red, title = 'ema200', linewidth = 2)
+
+// シグナル表示
+plotshape(res.emaBuy,  title = 'EMAクロス買い', location = location.belowbar, color = color.lime, style = shape.labelup, text = '買', textcolor = color.black)
+plotshape(res.emaSell, title = 'EMAクロス売り', location = location.abovebar, color = color.red, style = shape.labeldown, text = '売', textcolor = color.white)
+
 // ==============================
-// ストラテジー（半値戻し指値エントリー）
+// ストラテジー変数と設定
+// ==============================
+var float longStopPrice = na
+var float shortStopPrice = na
+ema5  = ta.ema(src, ema_len1)
+ema25 = ta.ema(src, ema_len2)
+
+// ==============================
+// エントリーロジック
 // ==============================
 
-// 買いシグナル：点灯した足の「高値と安値の真ん中」に指値を置く
+// 買いシグナル
 if res.emaBuy
-    float halfPriceLong = (high + low) / 2
-    strategy.entry("Long", strategy.long, limit = halfPriceLong)
+    // 損切：安値(low)からさらに2%下
+    longStopPrice := low * (1 - sl_buffer) 
+    // 成行でエントリー
+    strategy.entry("Long", strategy.long) 
 
-// 売りシグナル：点灯した足の「高値と安値の真ん中」に指値を置く
+// 売りシグナル
 if res.emaSell
-    float halfPriceShort = (high + low) / 2
-    strategy.entry("Short", strategy.short, limit = halfPriceShort)
-
+    // 損切：高値(high)からさらに2%上
+    shortStopPrice := high * (1 + sl_buffer)
+    // 成行でエントリー
+    strategy.entry("Short", strategy.short) 
 
 // ==============================
-// 利確・損切設定
+// 決済ロジック
 // ==============================
 
-// 比率の設定（0.05 = 2%, 0.10 = 5%）
-stopLossPercent   = 0.02
-takeProfitPercent = 0.05
-
-// 買いポジションの決済条件
+// --- 買いポジション ---
 if strategy.position_size > 0
-    float longStopPrice   = strategy.position_avg_price * (1 - stopLossPercent)
-    float longProfitPrice = strategy.position_avg_price * (1 + takeProfitPercent)
-    strategy.exit("Long Exit", "Long", stop = longStopPrice, limit = longProfitPrice)
+    // 利確1：EMAの逆クロス (EMA5が25を下抜け)
+    exit_ema_cross = ta.crossunder(ema5, ema25)
+    // 利確2：反対の売りサイン(res.emaSell)が点灯した場合
+    exit_signal = res.emaSell
+    
+    if exit_ema_cross or exit_signal
+        strategy.close("Long", comment = exit_signal ? "TP Signal" : "TP Cross")
+    
+    // 損切：全戻し-バッファ
+    strategy.exit("Long SL", "Long", stop = longStopPrice, comment="SL Full")
 
-// 売りポジションの決済条件
+// --- 売りポジション ---
 if strategy.position_size < 0
-    float shortStopPrice   = strategy.position_avg_price * (1 + stopLossPercent)
-    float shortProfitPrice = strategy.position_avg_price * (1 - takeProfitPercent)
-    strategy.exit("Short Exit", "Short", stop = shortStopPrice, limit = shortProfitPrice)
+    // 利確1：EMAの逆クロス (EMA5が25を上抜け)
+    exit_ema_cross = ta.crossover(ema5, ema25)
+    // 利確2：反対の買いサイン(res.emaBuy)が点灯した場合
+    exit_signal = res.emaBuy
+    
+    if exit_ema_cross or exit_signal
+        strategy.close("Short", comment = exit_signal ? "TP Signal" : "TP Cross")
+    
+    // 損切：全戻し+バッファ
+    strategy.exit("Short SL", "Short", stop = shortStopPrice, comment="SL Full")
+
+// 損切ラインの描画
+plot(strategy.position_size > 0 ? longStopPrice : na, color=color.red, style=plot.style_linebr, linewidth=2, title="Long SL (Full-2%)")
+plot(strategy.position_size < 0 ? shortStopPrice : na, color=color.orange, style=plot.style_linebr, linewidth=2, title="Short SL (Full+2%)")
