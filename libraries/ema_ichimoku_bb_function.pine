@@ -16,7 +16,7 @@
 
 library("EMA_Ichimoku_BB_Function")
 
-// 1. 戻り値用の型定義
+// 戻り値用の型定義
 export type SignalResult
     float ema5
     float ema25
@@ -36,7 +36,7 @@ export type SignalResult
     bool  bearishEngulfing
     bool  volSpike
 
-// 2. メイン計算関数のエクスポート (正しい構文)
+// メイン計算関数のエクスポート
 export calc(float src, int e5, int e25, int e50, int e100, int e200, int bbLen, float bbStd, int tLen, int kLen, int sBLen, int disp) =>
     // EMA計算
     e5_v   = ta.ema(src, e5)

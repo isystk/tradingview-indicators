@@ -61,14 +61,12 @@ p_upper = plot(res.bbUpper, color = color.new(color.gray, 50), title = 'BB Upper
 p_lower = plot(res.bbLower, color = color.new(color.gray, 50), title = 'BB Lower', linewidth = 4)
 
 // 一目均衡表
-disp = 26
 plot(res.tenkan, color = color.blue, title = '転換線', display = display.none)
 plot(res.kijun, color = color.purple, title = '基準線', display = display.none)
-p_senkouA = plot(res.senkouA, offset = disp, color = color.teal, title = '先行スパン1')
-p_senkouB = plot(res.senkouB, offset = disp, color = color.maroon, title = '先行スパン2')
-plot(close, offset = -disp, color = color.gray, title = '遅行スパン', display = display.none)
+p_senkouA = plot(res.senkouA, offset = ichi_disp, color = color.teal, title = '先行スパン1')
+p_senkouB = plot(res.senkouB, offset = ichi_disp, color = color.maroon, title = '先行スパン2')
+plot(close, offset = -ichi_disp, color = color.gray, title = '遅行スパン', display = display.none)
 fill(p_senkouA, p_senkouB, color = res.senkouA > res.senkouB ? color.new(color.green, 90) : color.new(color.red, 90), title = '一目雲')
-
 
 // シグナル表示
 plotshape(res.emaBuy,  title = 'EMAクロス買い', location = location.belowbar, color = color.lime, style = shape.labelup, text = '買', textcolor = color.black)
